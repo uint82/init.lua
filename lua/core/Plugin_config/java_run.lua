@@ -21,12 +21,34 @@ function M.setup()
     local compile_job = vim.fn.jobstart(compile_cmd, {
       on_stdout = function(_, data)
         if data[1] ~= "" then
-          vim.api.nvim_buf_set_lines(buf, -1, -1, false, data)
+          -- Clean any control characters from the output
+          local cleaned_data = {}
+          for _, line in ipairs(data) do
+            if line ~= "" then
+              -- Remove carriage returns that might appear as "^M"
+              local cleaned_line = line:gsub("\r", "")
+              table.insert(cleaned_data, cleaned_line)
+            end
+          end
+          if #cleaned_data > 0 then
+            vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
+          end
         end
       end,
       on_stderr = function(_, data)
         if data[1] ~= "" then
-          vim.api.nvim_buf_set_lines(buf, -1, -1, false, data)
+          -- Clean any control characters from the output
+          local cleaned_data = {}
+          for _, line in ipairs(data) do
+            if line ~= "" then
+              -- Remove carriage returns that might appear as "^M"
+              local cleaned_line = line:gsub("\r", "")
+              table.insert(cleaned_data, cleaned_line)
+            end
+          end
+          if #cleaned_data > 0 then
+            vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
+          end
         end
       end,
       on_exit = function(_, exit_code)
@@ -38,17 +60,38 @@ function M.setup()
           vim.fn.jobstart(run_cmd, {
             on_stdout = function(_, data)
               if data[1] ~= "" then
-                vim.api.nvim_buf_set_lines(buf, -1, -1, false, data)
+                -- Clean any control characters from the output
+                local cleaned_data = {}
+                for _, line in ipairs(data) do
+                  if line ~= "" then
+                    -- Remove carriage returns that might appear as "^M"
+                    local cleaned_line = line:gsub("\r", "")
+                    table.insert(cleaned_data, cleaned_line)
+                  end
+                end
+                if #cleaned_data > 0 then
+                  vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
+                end
               end
             end,
             on_stderr = function(_, data)
               if data[1] ~= "" then
-                vim.api.nvim_buf_set_lines(buf, -1, -1, false, data)
+                -- Clean any control characters from the output
+                local cleaned_data = {}
+                for _, line in ipairs(data) do
+                  if line ~= "" then
+                    -- Remove carriage returns that might appear as "^M"
+                    local cleaned_line = line:gsub("\r", "")
+                    table.insert(cleaned_data, cleaned_line)
+                  end
+                end
+                if #cleaned_data > 0 then
+                  vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
+                end
               end
             end,
             on_exit = function(_, run_exit_code)
-              if run_exit_code ==
-                0 then
+              if run_exit_code == 0 then
                 vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Program completed successfully."})
               else
                 vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Program exited with code " .. run_exit_code})
