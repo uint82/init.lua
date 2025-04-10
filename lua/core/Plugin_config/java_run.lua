@@ -7,48 +7,76 @@ function M.setup()
     local file_name_no_ext = vim.fn.expand('%:t:r')
     local dir = vim.fn.expand('%:p:h')
     
-    -- Create a new buffer for output
-    vim.cmd('belowright new')
-    local buf = vim.api.nvim_get_current_buf()
-    vim.api.nvim_buf_set_name(buf, 'Java Output')
-    vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
+    -- Check if Java Output buffer already exists
+    local existing_buf = -1
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_get_name(buf):match("Java Output$") then
+        existing_buf = buf
+        break
+      end
+    end
     
-    -- Add 'q' keybinding to close the buffer
-    vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':close<CR>', {noremap = true, silent = true})
+    local buf
+    if existing_buf ~= -1 and vim.api.nvim_buf_is_valid(existing_buf) then
+      -- Reuse existing buffer
+      buf = existing_buf
+      -- Find and focus the window with this buffer
+      local found_win = false
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_buf(win) == buf then
+          vim.api.nvim_set_current_win(win)
+          found_win = true
+          break
+        end
+      end
+      -- If buffer exists but has no window, open it in a new split
+      if not found_win then
+        vim.cmd('belowright split')
+        vim.api.nvim_win_set_buf(0, buf)
+      end
+      -- Clear the buffer
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+    else
+      -- Create a new buffer
+      vim.cmd('belowright new')
+      buf = vim.api.nvim_get_current_buf()
+      vim.api.nvim_buf_set_name(buf, 'Java Output')
+      vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
+      
+      -- Add 'q' keybinding to close the buffer
+      vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':close<CR>', {noremap = true, silent = true})
+    end
+    
+    -- Clean any output lines
+    local function clean_output_lines(data)
+      if data[1] == "" and #data <= 1 then
+        return {}
+      end
+      
+      local cleaned_data = {}
+      for _, line in ipairs(data) do
+        if line ~= "" or #data > 1 then
+          -- Remove carriage returns that might appear as "^M"
+          local cleaned_line = line:gsub("\r", "")
+          table.insert(cleaned_data, cleaned_line)
+        end
+      end
+      return cleaned_data
+    end
     
     -- Compile the Java file
     local compile_cmd = 'javac -d "' .. dir .. '" "' .. file .. '"'
     local compile_job = vim.fn.jobstart(compile_cmd, {
       on_stdout = function(_, data)
-        if data[1] ~= "" then
-          -- Clean any control characters from the output
-          local cleaned_data = {}
-          for _, line in ipairs(data) do
-            if line ~= "" then
-              -- Remove carriage returns that might appear as "^M"
-              local cleaned_line = line:gsub("\r", "")
-              table.insert(cleaned_data, cleaned_line)
-            end
-          end
-          if #cleaned_data > 0 then
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
-          end
+        local cleaned_data = clean_output_lines(data)
+        if #cleaned_data > 0 then
+          vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
         end
       end,
       on_stderr = function(_, data)
-        if data[1] ~= "" then
-          -- Clean any control characters from the output
-          local cleaned_data = {}
-          for _, line in ipairs(data) do
-            if line ~= "" then
-              -- Remove carriage returns that might appear as "^M"
-              local cleaned_line = line:gsub("\r", "")
-              table.insert(cleaned_data, cleaned_line)
-            end
-          end
-          if #cleaned_data > 0 then
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
-          end
+        local cleaned_data = clean_output_lines(data)
+        if #cleaned_data > 0 then
+          vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
         end
       end,
       on_exit = function(_, exit_code)
@@ -59,35 +87,15 @@ function M.setup()
           local run_cmd = 'java -cp "' .. dir .. '" ' .. file_name_no_ext
           vim.fn.jobstart(run_cmd, {
             on_stdout = function(_, data)
-              if data[1] ~= "" then
-                -- Clean any control characters from the output
-                local cleaned_data = {}
-                for _, line in ipairs(data) do
-                  if line ~= "" then
-                    -- Remove carriage returns that might appear as "^M"
-                    local cleaned_line = line:gsub("\r", "")
-                    table.insert(cleaned_data, cleaned_line)
-                  end
-                end
-                if #cleaned_data > 0 then
-                  vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
-                end
+              local cleaned_data = clean_output_lines(data)
+              if #cleaned_data > 0 then
+                vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
               end
             end,
             on_stderr = function(_, data)
-              if data[1] ~= "" then
-                -- Clean any control characters from the output
-                local cleaned_data = {}
-                for _, line in ipairs(data) do
-                  if line ~= "" then
-                    -- Remove carriage returns that might appear as "^M"
-                    local cleaned_line = line:gsub("\r", "")
-                    table.insert(cleaned_data, cleaned_line)
-                  end
-                end
-                if #cleaned_data > 0 then
-                  vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
-                end
+              local cleaned_data = clean_output_lines(data)
+              if #cleaned_data > 0 then
+                vim.api.nvim_buf_set_lines(buf, -1, -1, false, cleaned_data)
               end
             end,
             on_exit = function(_, run_exit_code)
